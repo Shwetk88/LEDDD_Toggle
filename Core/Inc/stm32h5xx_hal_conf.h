@@ -25,6 +25,7 @@
 
 #ifndef STM32H5xx_HAL_CONF_H
 #define STM32H5xx_HAL_CONF_H
+#include <stdint.h>
 
 #ifdef __cplusplus
  extern "C" {
