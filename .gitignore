@@ -1,0 +1,10 @@
+Debug/
+Release/
+.build/
+.metadata/
+*.bin
+*.elf
+*.hex
+*.map
+*.launch
+*.log
