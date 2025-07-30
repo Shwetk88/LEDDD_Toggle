@@ -1,111 +1,70 @@
 # =============================================================================
-# Makefile for STM32H563xx Project (LED_Toggle)
+# Minimal & Automated Makefile for STM32 Projects
 # =============================================================================
 
-# --- Toolchain Definitions ---
-# Define the prefix for your ARM GCC toolchain
-PREFIX = arm-none-eabi-
-
-# Define the actual compiler, linker, etc.
-CC = $(PREFIX)gcc
-AS = $(PREFIX)as
-OBJCOPY = $(PREFIX)objcopy
-OBJDUMP = $(PREFIX)objdump
-SIZE = $(PREFIX)size
-
-# --- Project Definitions ---
-# The name of your final output files (without extension)
-TARGET = LED_Toggle
-# The directory where build output will be placed
-BUILD_DIR = build
+# --- Toolchain & Project Definitions ---
+PREFIX      = arm-none-eabi-
+CC          = $(PREFIX)gcc
+SIZE        = $(PREFIX)size
+TARGET      = LED_Toggle
+BUILD_DIR   = build
 
 # --- Compiler and Linker Flags ---
-# CPU specific flags
-CPU = -mcpu=cortex-m33
-MCU = $(CPU) -mthumb
+CPU         = -mcpu=cortex-m33
+MCU         = $(CPU) -mthumb
+CFLAGS      = $(MCU) -Wall -O0 -g -std=c11 -DSTM32H563xx
+LDFLAGS     = $(MCU) -TSTM32H563ZITX_FLASH.ld
 
-# C compiler flags
-# -Wall: Show all warnings
-# -O0: No optimization (best for debugging)
-# -g: Generate debugging information
-# -std=c11: Use the C11 standard
-# -DSTM32H563xx: Define the device macro
-CFLAGS = $(MCU) -Wall -O0 -g -std=c11 -DSTM32H563xx
+# --- AUTOMATICALLY FIND SOURCE FILES ---
+# List all the directories that contain your source files
+C_SRC_DIRS = Core/Src Drivers/STM32H5xx_HAL_Driver/Src
+ASM_SRC_DIRS = Core/Startup
 
-# Include directories for header files (-I)
-C_INCLUDES = -I./Core/Inc \
-             -I./Drivers/CMSIS/Include \
-             -I./Drivers/CMSIS/Device/ST/STM32H5xx/Include \
-             -I./Drivers/STM32H5xx_HAL_Driver/Inc
+# Use the 'wildcard' function to find all .c and .s files in those directories
+C_SOURCES = $(foreach dir,$(C_SRC_DIRS),$(wildcard $(dir)/*.c))
+ASM_SOURCES = $(foreach dir,$(ASM_SRC_DIRS),$(wildcard $(dir)/*.s))
+
+# --- AUTOMATICALLY FIND INCLUDE PATHS ---
+# Automatically create a list of include paths from the source directories
+C_INCLUDES = $(foreach dir,$(C_SRC_DIRS),-I$(dir))
+C_INCLUDES += -I./Core/Inc \
+              -I./Drivers/CMSIS/Include \
+              -I./Drivers/CMSIS/Device/ST/STM32H5xx/Include \
+              -I./Drivers/STM32H5xx_HAL_Driver/Inc
 
 # Add includes to the CFLAGS
 CFLAGS += $(C_INCLUDES)
 
-# Linker flags
-# -T: Specify the linker script
-LDFLAGS = $(MCU) -TSTM32H563ZITX_FLASH.ld
+# --- Build Rules (Now fully automated) ---
+# Create a list of object files in the build directory
+OBJECTS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(notdir $(C_SOURCES)))
+OBJECTS += $(patsubst %.s,$(BUILD_DIR)/%.o,$(notdir $(ASM_SOURCES)))
 
-# --- Source Files ---
-# List all of your C source (.c) files here
-C_SOURCES = Core/Src/main.c \
-            Core/Src/stm32h5xx_it.c \
-            Core/Src/system_stm32h5xx.c \
-            Core/Src/stm32h5xx_hal_msp.c \
-            Core/Src/syscalls.c \
-            Core/Src/sysmem.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_cortex.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_dma.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_dma_ex.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_exti.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_flash.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_flash_ex.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_gpio.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_pwr.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_pwr_ex.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_rcc.c \
-            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_rcc_ex.c
-
-# List all of your Assembly source (.s) files here
-ASM_SOURCES = Core/Startup/startup_stm32h563zitx.s
-
-# --- Build Rules ---
-# Automatically create a list of object files (.o) from the source files
-OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
+# Tell 'make' where to find the source files for the object files
 vpath %.c $(sort $(dir $(C_SOURCES)))
-
-OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
-# The default rule, executed when you just run "make"
+# --- Targets ---
 all: $(BUILD_DIR)/$(TARGET).elf
 
-# Rule to link the final .elf file from all the object files
 $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
+	$(CC) $^ $(LDFLAGS) -o $@
 	@echo "----------------"
 	@echo "ELF file created: $@"
 	$(SIZE) $@
 	@echo "----------------"
 
-# Rule to compile .c files into .o object files
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-# Rule to assemble .s files into .o object files
 $(BUILD_DIR)/%.o: %.s | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-# Rule to create the build directory
 $(BUILD_DIR):
 	mkdir -p $@
 
-# --- Clean Rule ---
-# Rule to remove all build artifacts
 clean:
 	rm -rf $(BUILD_DIR)
 	@echo "Build directory cleaned."
 
-# --- Phony Targets ---
-# Tells make that "all" and "clean" are not actual files
 .PHONY: all clean
