@@ -1,65 +1,74 @@
 # =============================================================================
-# Minimal & Automated Makefile for STM32 Projects
+# Makefile for STM32H563xx Project (LED_Toggle)
 # =============================================================================
 
-# --- Toolchain & Project Definitions ---
-PREFIX      = arm-none-eabi-
-CC          = $(PREFIX)gcc
-SIZE        = $(PREFIX)size
-TARGET      = LED_Toggle
-BUILD_DIR   = build
+# --- Toolchain Definitions ---
+PREFIX = arm-none-eabi-
+CC = $(PREFIX)gcc
+OBJCOPY = $(PREFIX)objcopy
+SIZE = $(PREFIX)size
+
+# --- Project Definitions ---
+TARGET = LED_Toggle
+BUILD_DIR = build
 
 # --- Compiler and Linker Flags ---
-CPU         = -mcpu=cortex-m33
-MCU         = $(CPU) -mthumb
-CFLAGS      = $(MCU) -Wall -O0 -g -std=c11 -DSTM32H563xx
-LDFLAGS     = $(MCU) -TSTM32H563ZITX_FLASH.ld
-
-# --- AUTOMATICALLY FIND SOURCE FILES ---
-# List all the directories that contain your source files
-C_SRC_DIRS = Core/Src Drivers/STM32H5xx_HAL_Driver/Src
-ASM_SRC_DIRS = Core/Startup
-
-# Use the 'wildcard' function to find all .c and .s files in those directories
-C_SOURCES = $(foreach dir,$(C_SRC_DIRS),$(wildcard $(dir)/*.c))
-ASM_SOURCES = $(foreach dir,$(ASM_SRC_DIRS),$(wildcard $(dir)/*.s))
-
-# --- AUTOMATICALLY FIND INCLUDE PATHS ---
-# Automatically create a list of include paths from the source directories
-C_INCLUDES = $(foreach dir,$(C_SRC_DIRS),-I$(dir))
-C_INCLUDES += -I./Core/Inc \
-              -I./Drivers/CMSIS/Include \
-              -I./Drivers/CMSIS/Device/ST/STM32H5xx/Include \
-              -I./Drivers/STM32H5xx_HAL_Driver/Inc
-
-# Add includes to the CFLAGS
+CPU = -mcpu=cortex-m33
+MCU = $(CPU) -mthumb
+CFLAGS = $(MCU) -Wall -O0 -g -std=c11 -DSTM32H563xx
+C_INCLUDES = -I./Core/Inc \
+             -I./Drivers/CMSIS/Include \
+             -I./Drivers/CMSIS/Device/ST/STM32H5xx/Include \
+             -I./Drivers/STM32H5xx_HAL_Driver/Inc
 CFLAGS += $(C_INCLUDES)
+LDFLAGS = $(MCU) -TSTM32H563ZITX_FLASH.ld
 
-# --- Build Rules (Now fully automated) ---
-# Create a list of object files in the build directory
-OBJECTS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(notdir $(C_SOURCES)))
-OBJECTS += $(patsubst %.s,$(BUILD_DIR)/%.o,$(notdir $(ASM_SOURCES)))
+# --- Source Files ---
+C_SOURCES = Core/Src/main.c \
+            Core/Src/stm32h5xx_it.c \
+            Core/Src/system_stm32h5xx.c \
+            Core/Src/stm32h5xx_hal_msp.c \
+            Core/Src/syscalls.c \
+            Core/Src/sysmem.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_cortex.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_dma.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_dma_ex.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_exti.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_flash.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_flash_ex.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_gpio.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_pwr.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_pwr_ex.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_rcc.c \
+            Drivers/STM32H5xx_HAL_Driver/Src/stm32h5xx_hal_rcc_ex.c
+ASM_SOURCES = Core/Startup/startup_stm32h563zitx.s
 
-# Tell 'make' where to find the source files for the object files
+# --- Build Rules ---
+OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 vpath %.c $(sort $(dir $(C_SOURCES)))
+OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
-# --- Targets ---
-all: $(BUILD_DIR)/$(TARGET).elf
+# MODIFIED: The 'all' rule now also depends on the .hex file
+all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex
 
 $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS)
-	$(CC) $^ $(LDFLAGS) -o $@
+	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 	@echo "----------------"
 	@echo "ELF file created: $@"
 	$(SIZE) $@
 	@echo "----------------"
 
+# NEW: Rule to create a .hex file from the .elf file
+$(BUILD_DIR)/$(TARGET).hex: $(BUILD_DIR)/$(TARGET).elf
+	$(OBJCOPY) -O ihex $< $@
+	@echo "HEX file created: $@"
+
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -o $@ $<
-
 $(BUILD_DIR)/%.o: %.s | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -o $@ $<
-
 $(BUILD_DIR):
 	mkdir -p $@
 
