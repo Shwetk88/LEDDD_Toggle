@@ -21,7 +21,9 @@ C_INCLUDES = -I./Core/Inc \
              -I./Drivers/CMSIS/Device/ST/STM32H5xx/Include \
              -I./Drivers/STM32H5xx_HAL_Driver/Inc
 CFLAGS += $(C_INCLUDES)
-LDFLAGS = $(MCU) -TSTM32H563ZITX_FLASH.ld
+
+# MODIFIED: Added the linker flag to generate a .map file
+LDFLAGS = $(MCU) -TSTM32H563ZITX_FLASH.ld -Wl,-Map=$(BUILD_DIR)/$(TARGET).map
 
 # --- Source Files ---
 C_SOURCES = Core/Src/main.c \
@@ -50,7 +52,6 @@ vpath %.c $(sort $(dir $(C_SOURCES)))
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
-# MODIFIED: The 'all' rule now also depends on the .hex file
 all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex
 
 $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS)
@@ -60,7 +61,6 @@ $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS)
 	$(SIZE) $@
 	@echo "----------------"
 
-# NEW: Rule to create a .hex file from the .elf file
 $(BUILD_DIR)/$(TARGET).hex: $(BUILD_DIR)/$(TARGET).elf
 	$(OBJCOPY) -O ihex $< $@
 	@echo "HEX file created: $@"
